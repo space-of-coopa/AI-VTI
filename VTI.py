@@ -2,7 +2,7 @@ import cv2
 import os
 
 def extract_frames_from_videos(video_folder, output_folder, frame_rate):
-    video_files = [f for f in os.listdir(video_folder) if f.endswith(('.mp4', '.avi', '.mov', '.mkv', 'mov'))]
+    video_files = [f for f in os.listdir(video_folder) if f.endswith(('.mp4', '.avi', '.mov', '.mkv', '.MOV'))]
 
     for video_file in video_files:
         video_path = os.path.join(video_folder, video_file)
