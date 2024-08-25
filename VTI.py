@@ -25,5 +25,4 @@ def extract_frames_from_videos(video_folder, output_folder, frame_rate):
         video_cap.release()
         print(f"Extracted frames from {video_file} are saved in {output_video_folder}")
 
-# 사용 예시
-extract_frames_from_videos('./VideoInput', './ImagesOutput', 10)
+extract_frames_from_videos('./VideoInput', './ImagesOutput', 2)
