@@ -1,7 +1,8 @@
 import cv2
 import os
-import numpy as np
-from multiprocessing import Pool, cpu_count
+import numpy
+import torch
+from concurrent.futures import ThreadPoolExecutor
 
 def extract_frames_from_video(video_path, output_video_folder, frame_rate):
     video_cap = cv2.VideoCapture(video_path)
@@ -10,32 +11,29 @@ def extract_frames_from_video(video_path, output_video_folder, frame_rate):
     count = 0
     frames = []
 
-    while count < total_frames:
-        success, image = video_cap.read()
-        if not success:
-            break
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        while count < total_frames:
+            success, image = video_cap.read()
+            if not success:
+                break
 
-        # 프레임 저장 (배치로 저장할 수 있도록 메모리에 모음)
-        frames.append((count, image))
+            # GPU로 이미지 데이터를 이동하고 변환하는 예시 (이 작업을 꼭 필요로 하는 경우에만)
+            if torch.cuda.is_available():
+                tensor_image = torch.from_numpy(image).to('cuda')
+                # 이미지 처리 로직 추가 가능 (GPU 상에서)
+                image = tensor_image.cpu().numpy()  # CPU로 다시 이동 (저장할 때만)
 
-        if len(frames) >= 10:  # 예: 배치 크기가 10인 경우
-            save_frames_batch(frames, output_video_folder)
-            frames.clear()
+            future = executor.submit(save_frame, image, output_video_folder, count)
+            frames.append(future)
 
-        count += frame_rate  # 다음 프레임으로 이동
-
-    # 남은 프레임 저장
-    if frames:
-        save_frames_batch(frames, output_video_folder)
+            count += frame_rate
 
     video_cap.release()
 
-def save_frames_batch(frames, output_video_folder):
-    """배치로 프레임을 저장하는 함수"""
-    for count, image in frames:
-        frame_filename = os.path.join(output_video_folder, f"frame_{count}.jpg")
-        cv2.imwrite(frame_filename, image)
-        print(f"Saved frame {count} to {frame_filename}")
+def save_frame(image, output_video_folder, count):
+    frame_filename = os.path.join(output_video_folder, f"frame_{count}.jpg")
+    cv2.imwrite(frame_filename, image)
+    print(f"Saved frame {count} to {frame_filename}")
 
 def process_video(video_file, video_folder, output_folder, frame_rate):
     video_path = os.path.join(video_folder, video_file)
@@ -48,13 +46,9 @@ def process_video(video_file, video_folder, output_folder, frame_rate):
 def extract_frames_from_videos(video_folder, output_folder, frame_rate):
     video_files = [f for f in os.listdir(video_folder) if f.endswith(('.mp4', '.avi', '.mov', '.mkv', '.MOV'))]
 
-    # 병렬 처리
-    pool = Pool(processes=cpu_count())
-    for video_file in video_files:
-        pool.apply_async(process_video, args=(video_file, video_folder, output_folder, frame_rate))
-
-    pool.close()
-    pool.join()
+    with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+        for video_file in video_files:
+            executor.submit(process_video, video_file, video_folder, output_folder, frame_rate)
 
 if __name__ == '__main__':
     video_folder_path = './VideoInput'
